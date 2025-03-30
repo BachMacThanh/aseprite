@@ -1,0 +1,287 @@
+name: Build and Release Aseprite
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number for this release (e.g. 1.3.0)'
+        required: true
+        default: ''
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            arch: x64
+            skia-file: "Skia-Windows-Release-x64.zip"
+            artifact-name: aseprite-windows-x64
+            installer-ext: zip
+          - os: windows-latest
+            platform: windows
+            arch: x86
+            skia-file: "Skia-Windows-Release-x86.zip"
+            artifact-name: aseprite-windows-x86
+            installer-ext: zip
+          - os: macos-latest
+            platform: macos
+            arch: x64
+            skia-file: "Skia-macOS-Release-x64.zip"
+            artifact-name: aseprite-macos-intel
+            installer-ext: zip
+          - os: macos-latest
+            platform: macos
+            arch: arm64
+            skia-file: "Skia-macOS-Release-arm64.zip"
+            artifact-name: aseprite-macos-arm64
+            installer-ext: zip
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            skia-file: "Skia-Linux-Release-x64-libc++.zip"
+            artifact-name: aseprite-linux-x64
+            installer-ext: tar.gz
+          - os: ubuntu-latest
+            platform: linux
+            arch: x86
+            skia-file: "Skia-Linux-Release-x86-libc++.zip"
+            artifact-name: aseprite-linux-x86
+            installer-ext: tar.gz
+
+    env:
+      SKIA_RELEASE: m102-861e4743af
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Set up version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Install dependencies (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          choco install ninja cmake
+          
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          brew install ninja cmake
+          
+      - name: Install dependencies (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ clang libc++-dev libc++abi-dev cmake ninja-build libx11-dev libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig1-dev
+          sudo apt-get install -y fuse libfuse2 libappindicator3-dev
+
+      - name: Download pre-built Skia
+        run: |
+          mkdir -p $HOME/deps
+          cd $HOME/deps
+          echo "Downloading ${{ matrix.skia-file }} from release ${{ env.SKIA_RELEASE }}..."
+          curl -L -o skia.zip https://github.com/aseprite/skia/releases/download/${{ env.SKIA_RELEASE }}/${{ matrix.skia-file }}
+          
+          # List the contents of the zip file for debugging
+          echo "Contents of the downloaded file:"
+          file skia.zip
+          
+          unzip -q skia.zip -d skia
+          
+          # List the extracted contents for debugging
+          echo "Extracted directory structure:"
+          find skia -type d | sort
+        shell: bash
+
+      - name: Set up MSVC (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Configure and build (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          dir
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLAF_BACKEND=skia -DSKIA_DIR=$HOME/deps/skia -DSKIA_LIBRARY_DIR=$HOME/deps/skia/out/Release-${{ matrix.arch }} -DSKIA_LIBRARY=$HOME/deps/skia/out/Release-${{ matrix.arch }}/skia.lib -G Ninja ..
+          ninja aseprite
+        shell: bash
+
+      - name: Configure and build (macOS Intel)
+        if: matrix.platform == 'macos' && matrix.arch == 'x64'
+        run: |
+          mkdir build
+          cd build
+          cmake \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 \
+            -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR=$HOME/deps/skia \
+            -DSKIA_LIBRARY_DIR=$HOME/deps/skia/out/Release-x64 \
+            -DSKIA_LIBRARY=$HOME/deps/skia/out/Release-x64/libskia.a \
+            -G Ninja \
+            ..
+          ninja aseprite
+        shell: bash
+
+      - name: Configure and build (macOS ARM64)
+        if: matrix.platform == 'macos' && matrix.arch == 'arm64'
+        run: |
+          mkdir build
+          cd build
+          cmake \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR=$HOME/deps/skia \
+            -DSKIA_LIBRARY_DIR=$HOME/deps/skia/out/Release-arm64 \
+            -DSKIA_LIBRARY=$HOME/deps/skia/out/Release-arm64/libskia.a \
+            -DPNG_ARM_NEON:STRING=on \
+            -G Ninja \
+            ..
+          ninja aseprite
+        shell: bash
+
+      - name: Configure and build (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir build
+          cd build
+          export CC=clang
+          export CXX=clang++
+          cmake \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ \
+            -DCMAKE_EXE_LINKER_FLAGS:STRING=-stdlib=libc++ \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR=$HOME/deps/skia \
+            -DSKIA_LIBRARY_DIR=$HOME/deps/skia/out/Release-${{ matrix.arch }} \
+            -DSKIA_LIBRARY=$HOME/deps/skia/out/Release-${{ matrix.arch }}/libskia.a \
+            -G Ninja \
+            ..
+          ninja aseprite
+        shell: bash
+
+      - name: Create Windows package
+        if: matrix.platform == 'windows'
+        run: |
+          mkdir -p packaging/win
+          cd build/bin
+          # Create a zip file for distribution
+          7z a -tzip ../../aseprite-${{ env.VERSION }}-windows-${{ matrix.arch }}.zip aseprite.exe data/
+        shell: bash
+
+      - name: Create macOS package
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p packaging/macos
+          cd build/bin
+          # Create a zip file for distribution
+          ARCH_SUFFIX="${{ matrix.arch == 'arm64' && '-arm64' || '' }}"
+          zip -r ../../aseprite-${{ env.VERSION }}-macos${ARCH_SUFFIX}.zip Aseprite.app/
+        shell: bash
+
+      - name: Create Linux package
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p packaging/linux
+          cd build/bin
+          # Create a tar.gz file for distribution
+          tar -czvf ../../aseprite-${{ env.VERSION }}-linux-${{ matrix.arch }}.tar.gz aseprite data/
+        shell: bash
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            aseprite-${{ env.VERSION }}-${{ matrix.platform }}-${{ matrix.arch }}*.${{ matrix.installer-ext }}
+          retention-days: 7
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: List artifacts for debugging
+        run: |
+          find artifacts -type f | sort
+        shell: bash
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Aseprite v${{ env.VERSION }}
+          draft: true
+          prerelease: false
+          files: |
+            artifacts/**/*
+            
+          body: |
+            # Aseprite v${{ env.VERSION }}
+            
+            ## Packages
+            
+            ### Windows
+            - Windows x64: Download the .zip file and extract to use Aseprite
+            - Windows x86: Download the .zip file and extract to use Aseprite
+            
+            ### macOS
+            - macOS Intel (x64): Download the .zip file, extract, and move Aseprite.app to your Applications folder
+            - macOS Apple Silicon (arm64): Download the .zip file, extract, and move Aseprite.app to your Applications folder
+            
+            ### Linux
+            - Linux x64: Download the .tar.gz file and extract to use Aseprite
+            - Linux x86: Download the .tar.gz file and extract to use Aseprite
+            
+            ## Release Notes
+            
+            Built by: @BachMacThanh  
+            Build date: 2025-03-30
+            
+            <Add your release notes here>
