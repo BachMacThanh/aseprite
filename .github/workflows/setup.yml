@@ -188,7 +188,7 @@ jobs:
         shell: bash
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/upload-artifact@v4.6.2
         with:
           path: artifacts
 
