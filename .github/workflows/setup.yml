@@ -27,38 +27,38 @@ jobs:
             installer-ext: zip
             inno-arch: "x64"
             inno-allowed: "x64"
-          - os: windows-latest
-            platform: windows
-            arch: x86
-            skia-file: "Skia-Windows-Release-x86.zip"
-            artifact-name: aseprite-windows-x86
-            installer-ext: zip
-            inno-arch: "x86"
-            inno-allowed: ""
-          - os: macos-latest
-            platform: macos
-            arch: x64
-            skia-file: "Skia-macOS-Release-x64.zip"
-            artifact-name: aseprite-macos-intel
-            installer-ext: zip
-          - os: macos-latest
-            platform: macos
-            arch: arm64
-            skia-file: "Skia-macOS-Release-arm64.zip"
-            artifact-name: aseprite-macos-arm64
-            installer-ext: zip
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            skia-file: "Skia-Linux-Release-x64-libc++.zip"
-            artifact-name: aseprite-linux-x64
-            installer-ext: tar.gz
-          - os: ubuntu-latest
-            platform: linux
-            arch: x86
-            skia-file: "Skia-Linux-Release-x86-libc++.zip"
-            artifact-name: aseprite-linux-x86
-            installer-ext: tar.gz
+          # - os: windows-latest
+          #   platform: windows
+          #   arch: x86
+          #   skia-file: "Skia-Windows-Release-x86.zip"
+          #   artifact-name: aseprite-windows-x86
+          #   installer-ext: zip
+          #   inno-arch: "x86"
+          #   inno-allowed: ""
+          # - os: macos-latest
+          #   platform: macos
+          #   arch: x64
+          #   skia-file: "Skia-macOS-Release-x64.zip"
+          #   artifact-name: aseprite-macos-intel
+          #   installer-ext: zip
+          # - os: macos-latest
+          #   platform: macos
+          #   arch: arm64
+          #   skia-file: "Skia-macOS-Release-arm64.zip"
+          #   artifact-name: aseprite-macos-arm64
+          #   installer-ext: zip
+          # - os: ubuntu-latest
+          #   platform: linux
+          #   arch: x64
+          #   skia-file: "Skia-Linux-Release-x64-libc++.zip"
+          #   artifact-name: aseprite-linux-x64
+          #   installer-ext: tar.gz
+          # - os: ubuntu-latest
+          #   platform: linux
+          #   arch: x86
+          #   skia-file: "Skia-Linux-Release-x86-libc++.zip"
+          #   artifact-name: aseprite-linux-x86
+          #   installer-ext: tar.gz
 
     env:
       SKIA_RELEASE: m102-861e4743af
