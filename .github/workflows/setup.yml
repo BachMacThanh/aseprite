@@ -192,11 +192,6 @@ jobs:
         with:
           path: artifacts
 
-      - name: List artifacts for debugging
-        run: |
-          find artifacts -type f | sort
-        shell: bash
-
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -208,7 +203,7 @@ jobs:
           draft: true
           prerelease: false
           files: |
-            artifacts/**/*
+            D:/a/aseprite-windows-x64.zip
             
           body: |
             # Aseprite v${{ env.VERSION }}
