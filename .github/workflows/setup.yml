@@ -149,11 +149,13 @@ jobs:
           cd build/bin
           # Create a zip file for distribution
           7z a -tzip ../../aseprite-${{ env.VERSION }}-windows-${{ matrix.arch }}.zip .
-          
-          # Create the Inno Setup installer
-          cd ../..
-          iscc /DAppVersion=${{ env.VERSION }} /DArchitecture=${{ matrix.inno-arch }} /DArchitecturesAllowed=${{ matrix.inno-allowed }} inno/aseprite.iss
         shell: bash
+
+      - name: Compile .ISS to .EXE Installer
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+        with:
+          path: inno/aseprite.iss
+          options: /DAppVersion=${{ env.VERSION }} /DArchitecture=${{ matrix.inno-arch }} /DArchitecturesAllowed=${{ matrix.inno-allowed }}
 
       # Mac and Linux packaging steps (commented out as they are in the original script)
       # ...
