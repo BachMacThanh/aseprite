@@ -61,7 +61,7 @@ jobs:
           #   installer-ext: tar.gz
 
     env:
-      SKIA_RELEASE: m102-861e4743af
+      SKIA_RELEASE: m136-44bb88b5a9
 
     steps:
       - name: Checkout repository
