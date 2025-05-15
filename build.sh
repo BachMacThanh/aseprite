@@ -56,11 +56,6 @@ if [ "$1" == "--norun" ] ; then
     norun=1
 fi
 
-# Platform.
-if ! source "$pwd/laf/misc/platform.sh" ; then
-    exit $?
-fi
-
 # Check utilities.
 if ! cmake --version >/dev/null ; then
     echo ""
@@ -117,6 +112,23 @@ if [ $run_submodule_update ] ; then
     echo "Done"
 fi
 
+# Platform.
+if ! source "$pwd/laf/misc/platform.sh" ; then
+    exit $?
+fi
+
+if [ $is_win ] ; then
+    # Check MSVC compiler.
+    if ! cl.exe >/dev/null 2>/dev/null ; then
+        echo ""
+        echo "MSVC compiler (cl.exe) not found in PATH"
+        echo ""
+        echo "  PATH=$PATH"
+        echo ""
+        exit 1
+    fi
+fi
+
 # Create the directory to store the configuration.
 if [ ! -d "$pwd/.build" ] ; then
     mkdir "$pwd/.build"
@@ -130,19 +142,19 @@ if [ ! -f "$pwd/.build/userkind" ] ; then
         echo "user" > $pwd/.build/userkind
     else
         echo ""
-        echo "Select what kind of user you are (press U or D keys):"
+        echo "Select what kind of user you are (press U or D key and then Enter):"
         echo ""
         echo "  [U]ser: give a try to Aseprite"
         echo "  [D]eveloper: develop/modify Aseprite"
         echo ""
-        read -sN 1 -p "[U/D]? "
-        echo ""
-        if [[ "$REPLY" == "d" || "$REPLY" == "D" ]] ; then
+        read -p "[U/D]? "
+        REPLY=$(echo $REPLY | tr '[:upper:]' '[:lower:]')
+        if [[ "$REPLY" == "d" || "$REPLY" == "dev" || "$REPLY" == "developer" ]] ; then
             echo "developer" > $pwd/.build/userkind
-        elif [[ "$REPLY" == "u" || "$REPLY" == "U" ]] ; then
+        elif [[ "$REPLY" == "u" || "$REPLY" == "user" ]] ; then
             echo "user" > $pwd/.build/userkind
         else
-            echo "Use U or D keys to select kind of user/build process"
+            echo "Use U or D keys (and press Enter) to select kind of user/build process"
             exit 1
         fi
     fi
@@ -245,7 +257,8 @@ else
     # New build
     if [[ "$build_n" == "n" || "$build_n" == "N" ]] ; then
         read -p "Select build type [RELEASE/debug]? "
-        if [[ "${REPLY,,}" == "debug" ]] ; then
+        REPLY=$(echo $REPLY | tr '[:upper:]' '[:lower:]')
+        if [[ "${REPLY}" == "debug" ]] ; then
             build_type=Debug
             new_build_name=aseprite-debug
         else
@@ -356,19 +369,29 @@ if [ ! -f "$pwd/.build/$file_skia_dir" ] ; then
         skia_dir="$HOME/deps/$possible_skia_dir_name"
     fi
 
+    # Set default location if not found
     if [ ! -d "$skia_dir" ] ; then
-        echo ""
-        echo "Skia directory wasn't found."
-        echo ""
-
-        echo "Select Skia directory to create [$skia_dir]? "
-        if [ ! $auto ] ; then
-            read skia_dir_read
-            if [ "$skia_dir_read" != "" ] ; then
-                skia_dir="$skia_dir_read"
-            fi
+        # Use .deps directory to download Skia for users (which is a
+        # simple setup). In case of developers we'd prefer the shared
+        # directory by default.
+        if [ "$userkind" == "user" ] ; then
+            skia_dir="$pwd/.deps/$possible_skia_dir_name"
         fi
-        mkdir -p $skia_dir || exit 1
+
+        if [ ! -d "$skia_dir" ] ; then
+            echo ""
+            echo "Skia directory wasn't found."
+            echo ""
+
+            echo "Select Skia directory to create [$skia_dir]? "
+            if [ ! $auto ] ; then
+                read skia_dir_read
+                if [ "$skia_dir_read" != "" ] ; then
+                    skia_dir="$skia_dir_read"
+                fi
+            fi
+            mkdir -p $skia_dir || exit 1
+        fi
     fi
     echo $skia_dir > "$pwd/.build/$file_skia_dir"
 fi
@@ -392,11 +415,11 @@ if [ ! -d "$skia_library_dir" ] ; then
     echo "Skia library wasn't found."
     echo ""
     if [ ! $auto ] ; then
-        read -sN 1 -p "Download pre-compiled Skia automatically [Y/n]? "
+        read -p "Download pre-compiled Skia automatically [Y/n]? "
         # Convert the Enter key as the default option: an empty string
-        REPLY=$(echo $REPLY | xargs)
+        REPLY=$(echo $REPLY | tr '[:upper:]' '[:lower:]' | xargs)
     fi
-    if [[ $auto || "$REPLY" == "" || "$REPLY" == "y" || "$REPLY" == "Y" ]] ; then
+    if [[ $auto || "$REPLY" == "" || "$REPLY" == "y" || "$REPLY" == "yes" ]] ; then
         if [[ $is_win && "$build_type" == "Debug" ]] ; then
             skia_build=Debug
         else
@@ -434,7 +457,7 @@ if [ ! -f "$active_build_dir/ninja.build" ] ; then
     echo "This will take some minutes."
     echo ""
     if [ ! $auto ] ; then
-        read -sN 1 -p "Press any key to continue. "
+        read -p "Press Enter to continue."
     fi
 
     if [ $is_macos ] ; then
